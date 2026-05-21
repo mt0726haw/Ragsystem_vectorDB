@@ -1,0 +1,29 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Virtual envs ---
+venv/
+.venv/
+env/
+
+# --- Local config & secrets ---
+.env
+*.local
+
+# --- Vector store data ---
+vectorstore/qdrant/
+!vectorstore/qdrant/.gitkeep
+
+# --- Editor ---
+.vscode/
+.idea/
+*.swp
+.DS_Store

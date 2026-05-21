@@ -1,0 +1,53 @@
+# RAG sources configuration
+# ---------------------------------------------------------------------------
+# Add a new entry under `sources:` to ingest additional data without
+# touching any Python code. Each entry has:
+#   name:     unique logical identifier
+#   path:     directory (relative to repo root) that will be scanned recursively
+#   category: one of {documentation, python_code, yaml_config, assembler}
+#   include:  list of glob patterns (matched against file name)
+
+sources:
+  - name: demo_sphinx_docs
+    path: ./data/demo/sphinx_docs
+    category: documentation
+    include:
+      - "*.md"
+
+  - name: demo_python_code
+    path: ./data/demo/python_code
+    category: python_code
+    include:
+      - "*.py"
+
+  - name: demo_yaml_config
+    path: ./data/demo/yaml_config
+    category: yaml_config
+    include:
+      - "*.yml"
+      - "*.yaml"
+
+  - name: demo_assembler
+    path: ./data/demo/assembler
+    category: assembler
+    include:
+      - "*.asm"
+      - "*.s"
+
+embedding:
+  model: sentence-transformers/all-MiniLM-L6-v2
+
+vectorstore:
+  type: qdrant
+  path: ./vectorstore/qdrant
+  collection: engineering_knowledge
+
+retrieval:
+  top_k: 5
+
+llm:
+  provider: litellm
+  model: openai/gpt-4o-mini
+  # Set to true once an API key (OPENAI_API_KEY, ANTHROPIC_API_KEY, ...) is
+  # provided. Until then, query.py only returns retrieval context.
+  enabled: false

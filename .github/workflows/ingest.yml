@@ -1,0 +1,100 @@
+name: Ingest Knowledge Base
+
+# "Train" the knowledge base: every time the data/ folder or the source
+# configuration changes, the workflow re-ingests everything into a fresh
+# local Qdrant vector store and uploads the resulting database as a build
+# artifact. The artifact can be downloaded and pointed at via QDRANT_PATH
+# or attached to a release for distribution.
+#
+# Triggers:
+#   - push to main when relevant paths change
+#   - manual via workflow_dispatch
+#   - nightly schedule (catches new docs that were merged without touching
+#     the trigger paths, e.g. via PR squash)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "data/**"
+      - "config/sources.yaml"
+      - "src/**"
+      - "ingest.py"
+      - "requirements.txt"
+  workflow_dispatch:
+    inputs:
+      config:
+        description: "Path to the sources YAML configuration"
+        required: false
+        default: "config/sources.yaml"
+  schedule:
+    # 03:17 UTC every day - off-peak.
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  ingest:
+    name: Build vector store
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Cache HuggingFace models
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/huggingface
+          key: hf-${{ runner.os }}-minilm-l6-v2
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run ingestion
+        env:
+          CONFIG_PATH: ${{ github.event.inputs.config || 'config/sources.yaml' }}
+        run: |
+          python ingest.py --config "$CONFIG_PATH" --verbose | tee ingest.log
+
+      - name: Show vector-store size
+        run: |
+          du -sh vectorstore/qdrant || true
+          ls -lah vectorstore/qdrant || true
+
+      - name: Upload vector store artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: qdrant-vectorstore-${{ github.sha }}
+          path: vectorstore/qdrant/
+          retention-days: 30
+
+      - name: Upload ingestion log
+        uses: actions/upload-artifact@v4
+        with:
+          name: ingest-log-${{ github.sha }}
+          path: ingest.log
+          retention-days: 14
+
+      - name: Job summary
+        run: |
+          {
+            echo "## 📚 Knowledge base ingested"
+            echo ""
+            echo "- Commit: \`${{ github.sha }}\`"
+            echo "- Config: \`${{ github.event.inputs.config || 'config/sources.yaml' }}\`"
+            echo ""
+            echo "### Stats"
+            echo '```'
+            tail -40 ingest.log || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
